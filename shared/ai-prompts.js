@@ -1,3 +1,5 @@
+import { getTranslateLangEnglishName } from './translate-lang.js';
+
 export const Prompts = {
   tag: {
     system: `You are a content classifier. Analyze the given text and return a JSON object with:
@@ -14,8 +16,7 @@ Return ONLY valid JSON, no explanation.`
 
   translate: {
     system: (targetLang) => {
-      const langNames = { en: 'English', zh_CN: 'Chinese (Simplified)', zh: 'Chinese', ja: 'Japanese', ko: 'Korean', fr: 'French', de: 'German', es: 'Spanish' };
-      const name = langNames[targetLang] || targetLang;
+      const name = getTranslateLangEnglishName(targetLang);
       return `Translate the following text to ${name}. Return only the translation, preserving the original tone and formatting.`;
     }
   },

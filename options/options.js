@@ -2,6 +2,7 @@ import { SettingsStorage } from '../shared/storage.js';
 import { ErrorHandler } from '../shared/error-handler.js';
 import { initI18n, applyI18nToDOM, t } from '../shared/i18n.js';
 import { applyThemePreference, createThemeController } from '../shared/theme.js';
+import { TRANSLATE_TARGET_LANGS } from '../shared/translate-lang.js';
 
 let settings = {};
 let excludedSites = [];
@@ -133,6 +134,23 @@ function localizeSelectOptions() {
       if (keys[i]) opt.textContent = t(keys[i].trim());
     });
   });
+  populateTranslateTargetLangSelect();
+}
+
+function populateTranslateTargetLangSelect() {
+  const select = document.getElementById('aiTranslateTargetLang');
+  if (!select) return;
+  const current = select.value || settings.ai?.translateTargetLang || 'auto';
+  select.innerHTML = TRANSLATE_TARGET_LANGS.map(
+    (lang) => `<option value="${lang.code}">${escapeHtml(t(lang.i18nKey))}</option>`
+  ).join('');
+  select.value = TRANSLATE_TARGET_LANGS.some((l) => l.code === current) ? current : 'auto';
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
 }
 
 function applyPageI18n() {
@@ -175,7 +193,7 @@ function collectForm() {
         rewriteEnabled: document.getElementById('aiRewrite').checked
       },
       rateLimitPerMinute: parseInt(document.getElementById('aiRateLimit').value, 10),
-      language: document.getElementById('aiLanguage').value
+      translateTargetLang: document.getElementById('aiTranslateTargetLang').value
     }
   };
 }
@@ -213,7 +231,10 @@ function fillForm(s) {
   document.getElementById('aiTranslate').checked = ai.features?.translateEnabled ?? true;
   document.getElementById('aiRewrite').checked = ai.features?.rewriteEnabled ?? true;
   document.getElementById('aiRateLimit').value = ai.rateLimitPerMinute || 15;
-  document.getElementById('aiLanguage').value = ai.language || 'auto';
+  const translateSel = document.getElementById('aiTranslateTargetLang');
+  if (translateSel) {
+    translateSel.value = ai.translateTargetLang || ai.language || 'auto';
+  }
   toggleOpenAIFields(ai.channel || 'chrome');
 }
 

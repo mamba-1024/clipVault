@@ -36,7 +36,7 @@ function shouldSkipInMemory(text) {
   if (!key) return true;
   const now = Date.now();
   const last = recentClipboard.get(key);
-  if (last != null && now - last < 3000) return true;
+  if (last != null && now - last < 5000) return true;
   recentClipboard.set(key, now);
   if (recentClipboard.size > 200) {
     for (const [k, t] of recentClipboard) {
@@ -47,11 +47,14 @@ function shouldSkipInMemory(text) {
 }
 
 function enqueueClipboardUpdate(message) {
-  if (shouldSkipInMemory(message.text)) {
+  const normalized = normalizeClipboardText(message.text);
+  if (!normalized) return Promise.resolve(null);
+  const payload = { ...message, text: normalized };
+  if (shouldSkipInMemory(normalized)) {
     return Promise.resolve(null);
   }
   clipboardQueue = clipboardQueue
-    .then(() => handleClipboardUpdate(message))
+    .then(() => handleClipboardUpdate(payload))
     .catch((err) => {
       ErrorHandler.log('clipboardQueue', err);
     });
@@ -437,7 +440,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const history = (await getLocal(KEYS.history)) || [];
         const item = history.find((h) => h.id === message.id);
         if (!item) return { ok: false, error: 'Item not found' };
-        return await engine.translate(item.text, message.targetLang || 'en');
+        const targetLang = message.targetLang || 'en';
+        const result = await engine.translate(item.text, targetLang);
+        if (result?.translatedText) {
+          item.aiTranslation = result.translatedText;
+          item.aiTranslationLang = targetLang;
+          await setLocal({ [KEYS.history]: history });
+          await notifyViews();
+        }
+        return result;
       }
 
       case 'AI_REWRITE': {

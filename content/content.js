@@ -5,7 +5,8 @@
   let cachedSelection = '';
   let lastSentText = '';
   let lastSentAt = 0;
-  const SEND_DEBOUNCE_MS = 2500;
+  const SEND_DEBOUNCE_MS = 3000;
+  let copyCaptureTimer = null;
 
   function getSelectedText() {
     const selection = window.getSelection()?.toString?.() || '';
@@ -90,13 +91,24 @@
     }
   }
 
-  function captureAndSend() {
-    const text = getSelectedText() || cachedSelection;
-    if (text) {
-      sendClipboardUpdate(text);
-      return true;
-    }
-    return false;
+  /** 一次复制只上报一次：优先读剪贴板（与系统一致），失败再用选区 */
+  function scheduleClipboardCapture() {
+    clearTimeout(copyCaptureTimer);
+    copyCaptureTimer = setTimeout(async () => {
+      let text = '';
+      if (navigator.clipboard?.readText) {
+        try {
+          text = await navigator.clipboard.readText();
+        } catch {
+          /* 无权限或页面限制 */
+        }
+      }
+      text = normalizeText(text);
+      if (!text) {
+        text = normalizeText(getSelectedText() || cachedSelection);
+      }
+      if (text) sendClipboardUpdate(text);
+    }, 100);
   }
 
   function flushPending() {
@@ -109,7 +121,11 @@
     }
     pending = pending.concat(memoryPending.splice(0));
     if (!pending.length) return;
+    const seen = new Set();
     pending.forEach((p) => {
+      const key = normalizeText(p.text);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
       try {
         chrome.runtime.sendMessage(p, () => {
           void chrome.runtime.lastError;
@@ -118,16 +134,6 @@
         queuePending(p);
       }
     });
-  }
-
-  async function tryReadClipboardFallback() {
-    if (!navigator.clipboard?.readText) return;
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text?.trim()) sendClipboardUpdate(text);
-    } catch {
-      /* 无 clipboard 权限或页面限制 */
-    }
   }
 
   document.addEventListener(
@@ -156,14 +162,11 @@
     true
   );
 
-  let fallbackTimer = null;
-
   document.addEventListener(
     'copy',
     () => {
-      if (captureAndSend()) return;
-      clearTimeout(fallbackTimer);
-      fallbackTimer = setTimeout(tryReadClipboardFallback, 50);
+      cacheSelection();
+      scheduleClipboardCapture();
     },
     true
   );
@@ -171,9 +174,8 @@
   document.addEventListener(
     'cut',
     () => {
-      if (captureAndSend()) return;
-      clearTimeout(fallbackTimer);
-      fallbackTimer = setTimeout(tryReadClipboardFallback, 50);
+      cacheSelection();
+      scheduleClipboardCapture();
     },
     true
   );

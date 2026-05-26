@@ -3,6 +3,7 @@ import { isSidePanelSupported, openSidePanelFromPopup } from './sidepanel-helper
 import { Icons } from './icons.js';
 import { animateListItems, pulseMain, updateTabIndicator } from './panel-motion.js';
 import { createThemeController } from './theme.js';
+import { resolveTranslateTargetLang } from './translate-lang.js';
 import { getActiveLocale, initI18n, t } from './i18n.js';
 
 function sendMessage(msg) {
@@ -69,6 +70,7 @@ export class PanelController {
     this.sort = this.settings.defaultSort || 'time_desc';
     this.renderer.aiEnabled = this.settings.ai?.enabled || false;
     this.renderer.aiFeatures = this.settings.ai?.features || {};
+    this.renderer.aiTranslateTargetLang = this.settings.ai?.translateTargetLang || 'auto';
     if (!this._themeCtrl) {
       this._themeCtrl = createThemeController(() => this.settings.theme || 'system');
       this._themeCtrl.install();
@@ -507,15 +509,42 @@ export class PanelController {
       btn.addEventListener('click', async () => {
         const id = btn.closest('[data-id]')?.dataset.id;
         if (!id) return;
-        const targetLang = this.settings.ai?.language === 'zh_CN' ? 'en' : 'zh_CN';
+        const item = this.historyItems.find((h) => h.id === id);
+        const targetLang = resolveTranslateTargetLang(
+          this.settings.ai?.translateTargetLang || 'auto',
+          { sourceLang: item?.aiLanguage, uiLocale: getActiveLocale() }
+        );
         btn.classList.add('loading');
         const res = await sendMessage({ type: 'AI_TRANSLATE', id, targetLang });
         btn.classList.remove('loading');
         if (res?.translatedText) {
-          this.renderer.showToast(res.translatedText, 5000);
+          const idx = this.historyItems.findIndex((h) => h.id === id);
+          if (idx >= 0) {
+            this.historyItems[idx].aiTranslation = res.translatedText;
+            this.historyItems[idx].aiTranslationLang = targetLang;
+          }
+          await this.loadHistory();
         } else if (res?.error) {
           this.renderer.showToast(res.error, 3000);
         }
+      });
+    });
+
+    main.querySelectorAll('.action-copy-translation').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.closest('[data-id]')?.dataset.id;
+        const item = this.historyItems.find((h) => h.id === id);
+        if (item?.aiTranslation) copyToClipboard(item.aiTranslation, this.renderer);
+      });
+    });
+
+    main.querySelectorAll('.ai-translation-text').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = el.closest('[data-id]')?.dataset.id;
+        const item = this.historyItems.find((h) => h.id === id);
+        if (item?.aiTranslation) copyToClipboard(item.aiTranslation, this.renderer);
       });
     });
 

@@ -31,7 +31,9 @@ const DEFAULT_SETTINGS = {
       rewriteEnabled: true
     },
     rateLimitPerMinute: 15,
-    language: 'auto'
+    /** @deprecated 使用 translateTargetLang */
+    language: 'auto',
+    translateTargetLang: 'auto'
   }
 };
 
@@ -55,6 +57,23 @@ export function normalizeClipboardText(text) {
 
 function textsMatch(a, b) {
   return normalizeClipboardText(a) === normalizeClipboardText(b);
+}
+
+function isHistoryDuplicateEntry(h, text, now, windowMs) {
+  return h.type === 'history' && textsMatch(h.text, text) && now - h.createdAt < windowMs;
+}
+
+/** 去掉时间窗内同文的其他条目（保留 exceptId） */
+function stripSameTextInWindow(history, text, now, windowMs, exceptId = null) {
+  return history.filter(
+    (h) =>
+      !(
+        h.type === 'history' &&
+        textsMatch(h.text, text) &&
+        now - h.createdAt < windowMs &&
+        h.id !== exceptId
+      )
+  );
 }
 
 function sortHistory(items, sort) {
@@ -96,7 +115,9 @@ export const SettingsStorage = {
       ai: {
         ...DEFAULT_SETTINGS.ai,
         ...(saved.ai || {}),
-        features: { ...DEFAULT_SETTINGS.ai.features, ...(saved.ai?.features || {}) }
+        features: { ...DEFAULT_SETTINGS.ai.features, ...(saved.ai?.features || {}) },
+        translateTargetLang:
+          saved.ai?.translateTargetLang || saved.ai?.language || DEFAULT_SETTINGS.ai.translateTargetLang
       }
     };
   },
@@ -145,28 +166,40 @@ export const Storage = {
       isTruncated = true;
     }
 
-    const history = (await getLocal(KEYS.history)) || [];
+    let history = (await getLocal(KEYS.history)) || [];
     const now = Date.now();
     const duplicateWindow = settings.duplicateIntervalSec * 1000;
 
-    const dupIndex = history.findIndex(
-      (h) =>
-        h.type === 'history' &&
-        textsMatch(h.text, text) &&
-        now - h.createdAt < duplicateWindow
-    );
+    const applyMerge = (existing) => {
+      const merged = {
+        ...existing,
+        text,
+        createdAt: now,
+        source: item.source ?? existing.source,
+        sourceTitle: item.sourceTitle ?? existing.sourceTitle,
+        charCount: text.length,
+        isTruncated: isTruncated || existing.isTruncated
+      };
+      const withoutOld = history.filter((h) => h.id !== existing.id);
+      const cleaned = stripSameTextInWindow(withoutOld, text, now, duplicateWindow, merged.id);
+      return [merged, ...cleaned];
+    };
 
-    if (dupIndex >= 0) {
-      const existing = { ...history[dupIndex] };
-      history.splice(dupIndex, 1);
-      existing.createdAt = now;
-      existing.source = item.source ?? existing.source;
-      existing.sourceTitle = item.sourceTitle ?? existing.sourceTitle;
-      existing.charCount = text.length;
-      history.unshift(existing);
+    // 最新一条已是相同内容：只更新时间（避免连续两次写入产生两条）
+    if (history[0]?.type === 'history' && textsMatch(history[0].text, text)) {
+      history = applyMerge(history[0]);
       await setLocal({ [KEYS.history]: history });
-      return existing;
+      return history[0];
     }
+
+    const dup = history.find((h) => isHistoryDuplicateEntry(h, text, now, duplicateWindow));
+    if (dup) {
+      history = applyMerge(dup);
+      await setLocal({ [KEYS.history]: history });
+      return history[0];
+    }
+
+    history = stripSameTextInWindow(history, text, now, duplicateWindow);
 
     const newItem = {
       ...item,
@@ -178,6 +211,8 @@ export const Storage = {
       createdAt: item.createdAt || now,
       aiTags: [],
       aiSummary: null,
+      aiTranslation: null,
+      aiTranslationLang: null,
       aiCategory: null,
       aiLanguage: null,
       aiEmbedding: null,

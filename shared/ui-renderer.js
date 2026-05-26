@@ -1,6 +1,7 @@
 import { ContentDetector } from './content-detector.js';
 import { Icons, TYPE_META } from './icons.js';
-import { t } from './i18n.js';
+import { getActiveLocale, t } from './i18n.js';
+import { resolveTranslateTargetLang, TRANSLATE_TARGET_LANGS } from './translate-lang.js';
 
 export function escapeHtml(str) {
   const div = document.createElement('div');
@@ -17,6 +18,17 @@ export class UIRenderer {
     this.batchMode = false;
     this.aiEnabled = false;
     this.aiFeatures = {};
+    this.aiTranslateTargetLang = 'auto';
+  }
+
+  translateActionTitle(item) {
+    const code = resolveTranslateTargetLang(this.aiTranslateTargetLang || 'auto', {
+      sourceLang: item?.aiLanguage,
+      uiLocale: getActiveLocale()
+    });
+    const entry = TRANSLATE_TARGET_LANGS.find((l) => l.code === code);
+    const label = entry ? t(entry.i18nKey) : code;
+    return t('actionTranslateTo', label);
   }
 
   formatRelativeTime(timestamp) {
@@ -139,8 +151,26 @@ export class UIRenderer {
       ? `<div class="ai-summary-chip"><span class="ai-label">AI</span> ${escapeHtml(item.aiSummary)}</div>`
       : '';
 
+    const translationLangEntry = TRANSLATE_TARGET_LANGS.find((l) => l.code === item.aiTranslationLang);
+    const translationLangLabel = translationLangEntry
+      ? t(translationLangEntry.i18nKey)
+      : item.aiTranslationLang || '';
+    const aiTranslationHtml =
+      this.aiEnabled && item.aiTranslation
+        ? `<div class="ai-translation-card">
+        <div class="ai-translation-head">
+          <span class="ai-label">${escapeHtml(t('aiTranslationLabel'))}</span>
+          ${translationLangLabel ? `<span class="ai-translation-lang">${escapeHtml(translationLangLabel)}</span>` : ''}
+          <button type="button" class="btn-text action-copy-translation" title="${escapeHtml(t('actionCopyTranslation'))}">
+            ${Icons.copy}<span>${escapeHtml(t('actionCopy'))}</span>
+          </button>
+        </div>
+        <p class="ai-translation-text">${escapeHtml(item.aiTranslation)}</p>
+      </div>`
+        : '';
+
     const aiActions = this.aiEnabled
-      ? `<div class="ai-actions">${this.aiFeatures.translateEnabled !== false ? `<button type="button" class="icon-btn action-ai-translate" title="${t('actionTranslate')}">${Icons.translate}</button>` : ''}${this.aiFeatures.rewriteEnabled !== false ? `<button type="button" class="icon-btn action-ai-rewrite" title="${t('actionRewrite')}">${Icons.rewrite}</button>` : ''}<button type="button" class="icon-btn action-ai-summarize" title="${t('actionSummarize')}">${Icons.sparkle}</button></div>`
+      ? `<div class="ai-actions">${this.aiFeatures.translateEnabled !== false ? `<button type="button" class="icon-btn action-ai-translate" title="${escapeHtml(this.translateActionTitle(item))}">${Icons.translate}</button>` : ''}${this.aiFeatures.rewriteEnabled !== false ? `<button type="button" class="icon-btn action-ai-rewrite" title="${t('actionRewrite')}">${Icons.rewrite}</button>` : ''}<button type="button" class="icon-btn action-ai-summarize" title="${t('actionSummarize')}">${Icons.sparkle}</button></div>`
       : '';
 
     return `
@@ -166,6 +196,7 @@ export class UIRenderer {
           ${item.isTruncated ? `<span class="truncated-badge">${t('truncatedBadge')}</span>` : ''}
         </div>
         ${aiSummaryHtml}
+        ${aiTranslationHtml}
         ${aiTagsHtml}
         <div class="item-actions">
           ${typeAction}
