@@ -1,0 +1,144 @@
+/* Chrome popup 上限 600px；高度由 --popup-max-h 控制（JS 已 clamp） */
+html.popup {
+  width: 380px !important;
+  height: min(var(--popup-max-h, 480px), 600px) !important;
+  max-height: 600px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+
+html.popup::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+html.popup body.popup {
+  width: 380px !important;
+  height: 100% !important;
+  max-height: 600px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+
+html.popup body.popup::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+body.popup #app.is-popup-shell {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  position: relative;
+  background: var(--bg);
+  box-sizing: border-box;
+}
+
+body.popup .popup-header,
+body.popup .popup-toolbar,
+body.popup .popup-bottom {
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+body.popup .popup-header .panel-header {
+  border-bottom: none;
+  padding-bottom: 8px;
+}
+
+body.popup .popup-toolbar {
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 6px;
+}
+
+body.popup .popup-toolbar .search-wrap {
+  margin-top: 0;
+}
+
+body.popup .popup-search-opts {
+  margin: 0 14px 6px;
+}
+
+body.popup .popup-toolbar .batch-bar {
+  margin: 0 14px 4px;
+}
+
+body.popup .popup-bottom {
+  border-top: 1px solid var(--glass-border);
+}
+
+body.popup .popup-bottom .panel-footer {
+  border-top: none;
+}
+
+/* 中部：flex 占满剩余高度；空列表不滚，有列表项时可滚 */
+body.popup #popup-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  overscroll-behavior: contain;
+  padding: 4px 14px 12px;
+  background: var(--bg);
+  scrollbar-width: none;
+}
+
+body.popup #popup-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+body.popup #popup-scroll:has(
+  .history-item,
+  .snippet-item,
+  .search-tab-result,
+  .snippet-editor
+) {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+body.popup #popup-scroll:has(
+  .history-item,
+  .snippet-item,
+  .search-tab-result,
+  .snippet-editor
+)::-webkit-scrollbar {
+  width: 6px;
+}
+
+body.popup #popup-scroll:has(
+  .history-item,
+  .snippet-item,
+  .search-tab-result,
+  .snippet-editor
+)::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.4);
+  border-radius: 4px;
+}
+
+body.popup .empty-state {
+  padding: 24px 20px;
+}
+
+/* 空状态动画不撑出滚动区域 */
+body.popup .empty-icon::after {
+  animation: none;
+}

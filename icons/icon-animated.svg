@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="cGrad" x1="24" y1="20" x2="104" y2="108" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00d4ff"/>
+      <stop offset="0.5" stop-color="#5b8dff"/>
+      <stop offset="1" stop-color="#7c5cff"/>
+    </linearGradient>
+    <linearGradient id="spinGrad" gradientUnits="userSpaceOnUse" x1="64" y1="10" x2="64" y2="118">
+      <stop offset="0" stop-color="#00d4ff"/>
+      <stop offset="0.5" stop-color="#7c5cff"/>
+      <stop offset="1" stop-color="#00d4ff"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(64 64)">
+    <g>
+      <animateTransform
+        attributeName="transform"
+        type="rotate"
+        from="0"
+        to="360"
+        dur="4s"
+        repeatCount="indefinite"
+      />
+      <circle r="54" fill="none" stroke="url(#spinGrad)" stroke-width="10" stroke-linecap="round" stroke-dasharray="280 60"/>
+      <circle r="54" fill="none" stroke="url(#spinGrad)" stroke-width="2" stroke-opacity="0.3"/>
+    </g>
+  </g>
+  <circle cx="64" cy="64" r="40" fill="#0a0e1a"/>
+  <text
+    x="64"
+    y="78"
+    text-anchor="middle"
+    font-family="system-ui, sans-serif"
+    font-size="52"
+    font-weight="700"
+    fill="url(#cGrad)"
+  >C</text>
+</svg>
