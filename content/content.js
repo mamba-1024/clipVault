@@ -47,6 +47,28 @@
   }
 
   const memoryPending = [];
+  let ignoreClipboardUntil = 0;
+  let ignoreClipboardText = '';
+
+  function markInternalClipboardWrite(text) {
+    const norm = normalizeText(text);
+    ignoreClipboardUntil = Date.now() + 8000;
+    ignoreClipboardText = norm;
+    try {
+      chrome.runtime.sendMessage({ type: 'IGNORE_CLIPBOARD_CAPTURE', text: norm });
+    } catch {
+      /* 扩展未就绪 */
+    }
+  }
+
+  function shouldIgnoreClipboardCapture(text) {
+    const norm = normalizeText(text);
+    if (!norm) return true;
+    if (Date.now() < ignoreClipboardUntil) {
+      if (!ignoreClipboardText || ignoreClipboardText === norm) return true;
+    }
+    return false;
+  }
 
   function queuePending(payload) {
     try {
@@ -61,7 +83,7 @@
 
   function sendClipboardUpdate(text) {
     text = normalizeText(text);
-    if (!text) return;
+    if (!text || shouldIgnoreClipboardCapture(text)) return;
 
     const now = Date.now();
     if (text === lastSentText && now - lastSentAt < SEND_DEBOUNCE_MS) return;
@@ -187,6 +209,7 @@
       return;
     }
     if (msg.type === 'COPY_TO_CLIPBOARD') {
+      markInternalClipboardWrite(msg.text);
       navigator.clipboard.writeText(msg.text).then(
         () => sendResponse({ ok: true }),
         () => {

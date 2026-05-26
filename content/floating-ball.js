@@ -535,6 +535,7 @@
         ev.stopPropagation();
         const text = cachedHistory[parseInt(el.dataset.idx, 10)]?.text || '';
         if (!text) return;
+        await send('IGNORE_CLIPBOARD_CAPTURE', { text, ttlMs: 8000 });
         try {
           await navigator.clipboard.writeText(text);
         } catch {

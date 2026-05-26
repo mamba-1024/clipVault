@@ -16,6 +16,13 @@ function sendMessage(msg) {
 }
 
 export async function copyToClipboard(text, renderer) {
+  if (!text) return;
+  try {
+    await sendMessage({ type: 'IGNORE_CLIPBOARD_CAPTURE', text, ttlMs: 8000 });
+  } catch {
+    /* ignore */
+  }
+
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab?.id) {

@@ -31,6 +31,32 @@ let clipboardQueue = Promise.resolve();
 /** 内存级快速去重（与 storage 去重窗口配合，挡住毫秒级双发） */
 const recentClipboard = new Map();
 
+/** 扩展内主动写入剪贴板时登记，避免再次记入历史（如按 1–9 复制） */
+const ignoredClipboard = new Map();
+
+function registerIgnoredClipboard(text, ttlMs = 8000) {
+  const key = normalizeClipboardText(text);
+  if (!key) return;
+  ignoredClipboard.set(key, Date.now() + ttlMs);
+  recentClipboard.set(key, Date.now());
+  if (ignoredClipboard.size > 200) {
+    const now = Date.now();
+    for (const [k, until] of ignoredClipboard) {
+      if (until <= now) ignoredClipboard.delete(k);
+    }
+  }
+}
+
+function shouldIgnoreClipboard(text) {
+  const key = normalizeClipboardText(text);
+  if (!key) return false;
+  const until = ignoredClipboard.get(key);
+  if (!until) return false;
+  if (Date.now() < until) return true;
+  ignoredClipboard.delete(key);
+  return false;
+}
+
 function shouldSkipInMemory(text) {
   const key = normalizeClipboardText(text);
   if (!key) return true;
@@ -50,7 +76,7 @@ function enqueueClipboardUpdate(message) {
   const normalized = normalizeClipboardText(message.text);
   if (!normalized) return Promise.resolve(null);
   const payload = { ...message, text: normalized };
-  if (shouldSkipInMemory(normalized)) {
+  if (shouldIgnoreClipboard(normalized) || shouldSkipInMemory(normalized)) {
     return Promise.resolve(null);
   }
   clipboardQueue = clipboardQueue
@@ -86,6 +112,7 @@ async function handleClipboardUpdate({ text, source, sourceTitle }) {
 
     const normalizedText = normalizeClipboardText(text);
     if (!normalizedText) return;
+    if (shouldIgnoreClipboard(normalizedText)) return;
 
     const detected = ContentDetector.detect(normalizedText);
 
@@ -279,6 +306,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
       case 'CONTENT_SCRIPT_READY':
         return { ok: true };
+
+      case 'IGNORE_CLIPBOARD_CAPTURE': {
+        registerIgnoredClipboard(message.text, message.ttlMs || 8000);
+        return { ok: true };
+      }
 
       case 'CLIPBOARD_UPDATE':
         await enqueueClipboardUpdate(message);
